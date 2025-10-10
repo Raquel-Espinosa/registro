@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Eventos Diarios</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #employee-modal {
+            @apply fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50;
+        }
+        #notification {
+            @apply fixed top-5 right-5 p-4 rounded-lg shadow-lg text-white transition-opacity duration-300 opacity-0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <!-- Modal para Número de Empleado -->
+    <div id="employee-modal">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Bienvenido</h2>
+            <p class="text-gray-600 mb-6">Ingresa tu número de empleado para continuar.</p>
+            <form id="employee-form">
+                <input type="number" id="employee-id" placeholder="Número de 5 dígitos" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <p id="employee-id-error" class="text-red-500 text-sm mt-2 h-5"></p>
+                <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg mt-4 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition">
+                    Continuar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Contenido Principal de la App -->
+    <main id="app-content" class="container mx-auto p-4 max-w-4xl text-center hidden">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Registrador de Eventos</h1>
+            <p class="text-gray-600 mt-2">Selecciona el evento que deseas registrar.</p>
+            <div class="mt-4 text-sm text-gray-500 bg-gray-200 inline-block px-3 py-1 rounded-full">
+                Registrando como empleado: <strong id="current-employee" class="text-gray-700"></strong>
+            </div>
+        </header>
+        
+        <div id="events-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Los botones de eventos se generan con JavaScript -->
+        </div>
+
+        <footer class="mt-12">
+            <button id="logout-btn" class="bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-75 transition">
+                Salir (Cambiar Empleado)
+            </button>
+        </footer>
+    </main>
+
+    <!-- Indicador de Carga -->
+    <div id="loader" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white"></div>
+    </div>
+
+    <!-- Notificación -->
+    <div id="notification"></div>
+
+    <script>
+        // URL de tu Web App de Google Apps Script.
+        // DEBES REEMPLAZAR ESTA URL con la que obtengas al publicar tu script.
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZG9zbKhkMnbMmVMY1IfDSARaHAe6m2zkMMSAEoicP3yZUS-VNxTFXlp6T0M_3-pPk/exec';
+
+        const employeeModal = document.getElementById('employee-modal');
+        const employeeForm = document.getElementById('employee-form');
+        const employeeIdInput = document.getElementById('employee-id');
+        const employeeIdError = document.getElementById('employee-id-error');
+        const appContent = document.getElementById('app-content');
+        const currentEmployee = document.getElementById('current-employee');
+        const eventsGrid = document.getElementById('events-grid');
+        const loader = document.getElementById('loader');
+        const notification = document.getElementById('notification');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        let employeeId = null;
+
+        const events = [
+            "Reimpresión de etiquetas",
+            "Revisión de PC",
+            "Liberación de Spool",
+            "Solicitud de Playo",
+            "Cambio de RF",
+            "Bajar reportes",
+            "Licencias para RF"
+        ];
+
+        // Rellenar la cuadrícula de eventos
+        function populateEvents() {
+            eventsGrid.innerHTML = '';
+            events.forEach(event => {
+                const button = document.createElement('button');
+                button.textContent = event;
+                // Aplicar clases de Tailwind directamente ya que @apply no funciona con el CDN
+                button.className = 'w-full bg-blue-600 text-white font-bold py-4 px-4 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform transform hover:scale-105';
+                button.dataset.event = event;
+                button.addEventListener('click', handleEventClick);
+                eventsGrid.appendChild(button);
+            });
+        }
+        
+        // Manejar el envío del formulario de empleado
+        employeeForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = employeeIdInput.value;
+            if (id.length === 5 && /^\d+$/.test(id)) {
+                employeeId = id;
+                currentEmployee.textContent = employeeId;
+                employeeModal.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                populateEvents();
+            } else {
+                employeeIdError.textContent = 'Por favor, ingresa un número de 5 dígitos.';
+                employeeIdInput.classList.add('border-red-500');
+            }
+        });
+        
+        employeeIdInput.addEventListener('input', () => {
+             if (employeeIdInput.value.length <= 5) {
+                employeeIdError.textContent = '';
+                employeeIdInput.classList.remove('border-red-500');
+            } else {
+                employeeIdInput.value = employeeIdInput.value.slice(0, 5);
+             }
+        });
+
+        // Manejar el botón de salir
+        logoutBtn.addEventListener('click', () => {
+            employeeId = null;
+            employeeIdInput.value = '';
+            appContent.classList.add('hidden');
+            employeeModal.classList.remove('hidden');
+            employeeIdError.textContent = '';
+            employeeIdInput.classList.remove('border-red-500');
+        });
+
+        // Manejar el clic en un botón de evento
+        async function handleEventClick(e) {
+            const eventName = e.target.dataset.event;
+            
+            if (SCRIPT_URL === 'URL_DE_TU_SCRIPT_AQUI') {
+                showNotification('Error: La URL del script no ha sido configurada.', 'error');
+                return;
+            }
+
+            loader.classList.remove('hidden');
+
+            const data = {
+                employeeId: employeeId,
+                event: eventName,
+                timestamp: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })
+            };
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showNotification('Evento registrado con éxito.', 'success');
+                } else {
+                    throw new Error(result.message || 'Error desconocido del servidor.');
+                }
+
+            } catch (error) {
+                console.error('Error al registrar el evento:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        // Mostrar notificaciones
+        function showNotification(message, type) {
+            notification.textContent = message;
+            notification.className = 'fixed top-5 right-5 p-4 rounded-lg shadow-lg text-white transition-opacity duration-300'; // Reset classes
+            if (type === 'success') {
+                notification.classList.add('bg-green-500');
+            } else {
+                notification.classList.add('bg-red-500');
+            }
+            
+            notification.classList.remove('opacity-0');
+
+            setTimeout(() => {
+                notification.classList.add('opacity-0');
+            }, 3000);
+        }
+
+    </script>
+</body>
+</html>
+
+
+
